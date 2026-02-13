@@ -1,0 +1,7 @@
+{
+  "name": "CavaleteMaster - Sistema de Gestão de Cavaletes",
+  "description": "Uma plataforma profissional para gerenciamento de 50 cavaletes industriais, controle de status, registros de clientes e ordens de serviço.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
