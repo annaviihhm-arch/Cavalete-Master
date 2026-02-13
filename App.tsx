@@ -1,54 +1,55 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
-import AuthGuard from './components/AuthGuard';
+import React, { useState, useEffect } from 'react';
 import Dashboard from './components/Dashboard';
 import RackModal from './components/RackModal';
-import SharingModal from './components/SharingModal';
-import { LayoutIcon, LogoutIcon, UserIcon, ShareIcon } from './components/Icons';
-import { RackData, User, UserRole } from './types';
+import { LayoutIcon, ShareIcon, CheckIcon } from './components/Icons';
+import { RackData } from './types';
 import { storageService } from './services/storageService';
+import { DEFAULT_PATIO_ID } from './constants';
 
-const AppContent: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLogout }) => {
+const App: React.FC = () => {
   const [racks, setRacks] = useState<RackData[]>([]);
   const [selectedRack, setSelectedRack] = useState<RackData | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isSharingModalOpen, setIsSharingModalOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  // Lógica de Visualização (Própria vs Compartilhada)
+  // Obtém o ID do pátio da URL ou usa o padrão
   const urlParams = new URLSearchParams(window.location.search);
-  const viewEmail = urlParams.get('view');
-  const isViewingOwn = !viewEmail || viewEmail.toLowerCase() === user.email.toLowerCase();
-  const ownerEmail = isViewingOwn ? user.email : viewEmail!;
-
-  // Determinar Papel
-  const role: UserRole = useMemo(() => {
-    if (isViewingOwn) return 'OWNER';
-    const perms = storageService.getPermissions(ownerEmail);
-    const myPerm = perms.find(p => p.granteeEmail.toLowerCase() === user.email.toLowerCase());
-    return myPerm ? myPerm.role : 'OBSERVER';
-  }, [isViewingOwn, ownerEmail, user.email]);
+  const patioId = urlParams.get('patio') || DEFAULT_PATIO_ID;
+  const isShared = patioId !== DEFAULT_PATIO_ID;
 
   useEffect(() => {
-    // Carregar Racks
-    setRacks(storageService.getRacks(ownerEmail));
-
-    // Auto-registrar na lista de quem acessou o link de Anna
-    if (!isViewingOwn) {
-      const perms = storageService.getPermissions(ownerEmail);
-      if (!perms.find(p => p.granteeEmail.toLowerCase() === user.email.toLowerCase())) {
-        storageService.updatePermission(ownerEmail, user.email, 'OBSERVER', user.name);
+    setRacks(storageService.getRacks(patioId));
+    
+    // Simulação de "Tempo Real" - Escuta mudanças no localStorage de outras abas
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === storageService.getPatioKey(patioId)) {
+        setRacks(storageService.getRacks(patioId));
       }
-    }
-  }, [ownerEmail, isViewingOwn, user.email, user.name]);
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [patioId]);
 
   const handleSaveRack = (updatedRack: RackData) => {
-    if (role === 'OBSERVER') {
-      alert("Você não tem permissão para editar este pátio.");
-      return;
-    }
-    const newRacks = storageService.updateRack(ownerEmail, updatedRack);
+    const newRacks = storageService.updateRack(patioId, updatedRack);
     setRacks(newRacks);
     setSelectedRack(null);
+  };
+
+  const handleShare = () => {
+    const newId = isShared ? patioId : Math.random().toString(36).substring(2, 9);
+    const shareUrl = `${window.location.origin}${window.location.pathname}?patio=${newId}`;
+    navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    
+    if (!isShared) {
+      // Se era o pátio padrão, migra os dados para o novo ID compartilhado para não perder o que já foi feito
+      const currentData = storageService.getRacks(DEFAULT_PATIO_ID);
+      localStorage.setItem(storageService.getPatioKey(newId), JSON.stringify(currentData));
+      window.history.pushState({}, '', `?patio=${newId}`);
+    }
   };
 
   const stats = {
@@ -58,103 +59,135 @@ const AppContent: React.FC<{ user: User; onLogout: () => void }> = ({ user, onLo
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row">
-      <aside className="w-full md:w-64 bg-slate-900 text-white flex flex-col">
-        <div className="p-6 flex items-center gap-3">
-          <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center shadow-lg">
+    <div className="min-h-screen flex flex-col md:flex-row bg-slate-50">
+      {/* Sidebar */}
+      <aside className="w-full md:w-64 bg-slate-900 text-white flex flex-col shadow-2xl z-10">
+        <div className="p-6 flex items-center gap-3 border-b border-slate-800">
+          <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
             <LayoutIcon />
           </div>
-          <h1 className="font-black text-xl">Master</h1>
+          <div>
+            <h1 className="font-black text-xl leading-none">Cavalete</h1>
+            <p className="text-[10px] text-indigo-400 uppercase font-bold tracking-widest mt-1">Master Pro</p>
+          </div>
         </div>
 
         <nav className="flex-1 p-4 space-y-2">
-          <button 
-            onClick={() => window.location.href = window.location.pathname}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${isViewingOwn ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
-          >
-            <LayoutIcon /> Meus Cavaletes
-          </button>
+          <div className={`p-3 rounded-xl flex items-center gap-3 font-bold text-sm transition ${!isShared ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+            <LayoutIcon />
+            <span>Meu Pátio Local</span>
+          </div>
           
           <button 
-            onClick={() => setIsSharingModalOpen(true)}
-            className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white rounded-xl transition font-bold"
+            onClick={handleShare}
+            className={`w-full flex items-center justify-between p-3 rounded-xl font-bold text-sm transition group ${copied ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
           >
-            <ShareIcon /> Compartilhar
+            <div className="flex items-center gap-3">
+              <ShareIcon />
+              <span>{copied ? 'Link Copiado!' : 'Compartilhar'}</span>
+            </div>
+            {!copied && <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />}
           </button>
         </nav>
 
-        <div className="p-4 border-t border-slate-800 space-y-4">
-          <div className="flex items-center gap-3 px-2 py-3 bg-slate-800/50 rounded-xl">
-            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-[10px] font-bold">
-              {user.name.charAt(0)}
-            </div>
-            <div className="overflow-hidden">
-              <p className="text-xs font-bold truncate">{user.name}</p>
-              <p className="text-[10px] text-slate-500 truncate">{user.email}</p>
+        <div className="p-4 mt-auto border-t border-slate-800">
+          <div className="bg-slate-800/50 rounded-2xl p-4">
+            <p className="text-[10px] font-black text-slate-500 uppercase mb-2">Sincronização</p>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
+              <span className="text-xs font-bold text-slate-300">Tempo Real Ativo</span>
             </div>
           </div>
-          <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-3 text-rose-400 hover:bg-rose-500/10 rounded-xl transition font-bold text-sm">
-            <LogoutIcon /> Sair
-          </button>
         </div>
       </aside>
 
-      <main className="flex-1 bg-slate-50 flex flex-col max-h-screen overflow-hidden">
-        <header className="bg-white border-b border-slate-200 p-6 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex-1">
-            <h2 className="text-xl font-black text-slate-800">
-              {isViewingOwn ? 'Seu Painel' : `Pátio de ${ownerEmail.split('@')[0]}`}
-            </h2>
-            <div className="flex items-center gap-2 mt-1">
-              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${role === 'OWNER' ? 'bg-indigo-100 text-indigo-700' : role === 'EDITOR' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'}`}>
-                Papel: {role === 'OWNER' ? 'Dono' : role === 'EDITOR' ? 'Editor' : 'Observador'}
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col overflow-hidden">
+        <header className="bg-white border-b border-slate-200 p-4 md:p-6 flex flex-col lg:flex-row justify-between items-center gap-4 shadow-sm">
+          <div className="flex items-center gap-4 w-full lg:w-auto">
+            <div className="relative flex-1 lg:w-80">
+              <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-400">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               </span>
+              <input
+                type="text"
+                placeholder="Buscar cavalete, cliente ou OS..."
+                className="w-full pl-10 pr-4 py-2 bg-slate-100 border-transparent rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500 transition outline-none text-sm font-medium"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
           </div>
 
-          <div className="flex gap-4">
-            <div className="text-center px-4">
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Ocupados</p>
-              <p className="text-lg font-black text-rose-600">{stats.occupied}</p>
+          <div className="flex items-center gap-6">
+            <div className="flex gap-4">
+              <div className="text-right">
+                <p className="text-[10px] font-black text-slate-400 uppercase leading-none">Livres</p>
+                <p className="text-xl font-black text-emerald-600">{stats.free}</p>
+              </div>
+              <div className="text-right border-l border-slate-200 pl-4">
+                <p className="text-[10px] font-black text-slate-400 uppercase leading-none">Ocupados</p>
+                <p className="text-xl font-black text-rose-600">{stats.occupied}</p>
+              </div>
             </div>
-            <div className="text-center px-4">
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Livres</p>
-              <p className="text-lg font-black text-emerald-600">{stats.free}</p>
+            
+            <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${isShared ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
+              <div className={`w-1.5 h-1.5 rounded-full ${isShared ? 'bg-amber-500' : 'bg-indigo-500'}`} />
+              {isShared ? `Pátio Compartilhado: ${patioId}` : 'Pátio Privado'}
             </div>
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-6">
-          {!isViewingOwn && (
-            <div className="mb-6 bg-amber-50 border border-amber-100 p-3 rounded-xl text-amber-800 text-xs font-medium">
-              Você está visualizando os dados de outra conta. Permissão atual: <b>{role}</b>.
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+          <div className="max-w-[1400px] mx-auto">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="text-3xl font-black text-slate-800 tracking-tight">Mapa de Cavaletes</h2>
+                <p className="text-slate-500 font-medium">Controle de estoque e logística de pátio</p>
+              </div>
+              
+              {isShared && (
+                <div className="hidden md:flex items-center gap-2 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100 animate-pulse">
+                   <div className="flex -space-x-2">
+                      <div className="w-6 h-6 rounded-full bg-indigo-500 border-2 border-white flex items-center justify-center text-[8px] font-bold text-white">VC</div>
+                      <div className="w-6 h-6 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center text-[8px] font-bold text-white">AN</div>
+                   </div>
+                   <span className="text-[10px] font-bold text-slate-400 uppercase">2 Online agora</span>
+                </div>
+              )}
             </div>
-          )}
-          <Dashboard racks={racks} onSelectRack={setSelectedRack} />
+
+            <Dashboard 
+              racks={racks.filter(r => 
+                r.id.toString().includes(searchTerm) || 
+                r.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                r.orderNumber?.includes(searchTerm)
+              )} 
+              onSelectRack={setSelectedRack} 
+            />
+          </div>
         </div>
+
+        <footer className="bg-white border-t border-slate-200 px-6 py-3 flex items-center justify-between">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            {isShared ? 'Visualização em Nuvem (ID: ' + patioId + ')' : 'Armazenamento Local Ativo'}
+          </p>
+          <div className="flex items-center gap-4 text-[10px] font-bold text-slate-400">
+            <span>v2.5.0</span>
+            <div className="w-1 h-1 rounded-full bg-slate-300" />
+            <span>Suporte: 0800-MASTER</span>
+          </div>
+        </footer>
       </main>
 
       {selectedRack && (
         <RackModal 
           rack={selectedRack} 
           onClose={() => setSelectedRack(null)} 
-          onSave={handleSaveRack}
-          isReadOnly={role === 'OBSERVER'}
+          onSave={handleSaveRack} 
         />
       )}
-
-      {isSharingModalOpen && (
-        <SharingModal user={user} onClose={() => setIsSharingModalOpen(false)} />
-      )}
     </div>
-  );
-};
-
-const App: React.FC = () => {
-  return (
-    <AuthGuard>
-      {(user, onLogout) => <AppContent user={user} onLogout={onLogout} />}
-    </AuthGuard>
   );
 };
 

@@ -1,6 +1,5 @@
 
 export type RackStatus = 'FREE' | 'OCCUPIED' | 'MAINTENANCE';
-export type UserRole = 'OWNER' | 'EDITOR' | 'OBSERVER';
 
 export interface RackData {
   id: number;
@@ -13,18 +12,7 @@ export interface RackData {
   notes?: string;
 }
 
-export interface SharePermission {
-  granteeEmail: string;
-  granteeName: string;
-  role: 'EDITOR' | 'OBSERVER';
-}
-
-export interface User {
-  email: string;
-  name: string;
-}
-
 export interface AppState {
-  user: User | null;
   racks: RackData[];
+  currentPatioId: string;
 }

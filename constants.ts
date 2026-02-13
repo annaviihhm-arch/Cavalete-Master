@@ -1,9 +1,7 @@
 
 export const TOTAL_RACKS = 50;
-export const STORAGE_KEY_PREFIX = 'cavalete_master_data_';
-export const AUTH_KEY = 'cavalete_master_auth';
-export const USERS_KEY = 'cavalete_master_users';
-export const SHARES_KEY_PREFIX = 'cavalete_master_shares_';
+export const BASE_STORAGE_KEY = 'cavalete_master_patio_';
+export const DEFAULT_PATIO_ID = 'meu-patio-principal';
 
 export const STATUS_COLORS = {
   FREE: 'bg-emerald-100 text-emerald-700 border-emerald-200',
