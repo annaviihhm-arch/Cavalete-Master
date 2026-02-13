@@ -16,3 +16,17 @@ export interface AppState {
   racks: RackData[];
   currentPatioId: string;
 }
+
+// Added User and SharePermission types for Auth and Sharing
+export interface User {
+  email: string;
+  name: string;
+  password?: string;
+}
+
+export interface SharePermission {
+  ownerEmail: string;
+  granteeEmail: string;
+  granteeName: string;
+  role: 'EDITOR' | 'OBSERVER';
+}
