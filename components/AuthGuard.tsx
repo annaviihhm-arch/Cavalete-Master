@@ -13,14 +13,14 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [step, setStep] = useState<AuthStep>('LOGIN');
   
-  // Form fields
+  // Campos do Formulário
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [verificationInput, setVerificationInput] = useState('');
   
-  // Feedback states
+  // Estados de feedback
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [generatedCode, setGeneratedCode] = useState('');
@@ -28,7 +28,11 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   useEffect(() => {
     const savedAuth = localStorage.getItem(AUTH_KEY);
     if (savedAuth) {
-      setUser(JSON.parse(savedAuth));
+      try {
+        setUser(JSON.parse(savedAuth));
+      } catch (e) {
+        localStorage.removeItem(AUTH_KEY);
+      }
     }
   }, []);
 
@@ -60,41 +64,39 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     users.push(newUser);
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
     
-    setSuccess('Conta criada com sucesso! Faça login para acessar.');
+    setSuccess('Conta criada! Agora você pode fazer login.');
     setStep('LOGIN');
     setError('');
-    setName('');
   };
 
-  const initiatePasswordRecovery = (e: React.FormEvent) => {
+  const initiateRecovery = (e: React.FormEvent) => {
     e.preventDefault();
     const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    const exists = users.some((u: any) => u.email.toLowerCase() === email.toLowerCase());
+    const userExists = users.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
     
-    if (!exists) {
-      setError('E-mail não encontrado no sistema.');
+    if (!userExists) {
+      setError('E-mail não encontrado.');
       return;
     }
 
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     setGeneratedCode(code);
-    setError('');
-    // SIMULATED EMAIL SENDING
-    alert(`[SIMULAÇÃO] Código enviado para ${email}: ${code}`);
+    alert(`[SISTEMA] Código de recuperação enviado para ${email}: ${code}`);
     setStep('VERIFY_CODE');
+    setError('');
   };
 
-  const handleVerifyCode = (e: React.FormEvent) => {
+  const verifyCode = (e: React.FormEvent) => {
     e.preventDefault();
     if (verificationInput === generatedCode) {
       setStep('RESET_PASSWORD');
       setError('');
     } else {
-      setError('Código de verificação incorreto.');
+      setError('Código inválido.');
     }
   };
 
-  const handleResetPassword = (e: React.FormEvent) => {
+  const resetPassword = (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) {
       setError('As senhas não coincidem.');
@@ -102,198 +104,119 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     }
 
     const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    const updatedUsers = users.map((u: any) => {
-      if (u.email.toLowerCase() === email.toLowerCase()) {
-        return { ...u, password };
-      }
-      return u;
-    });
+    const updatedUsers = users.map((u: any) => 
+      u.email.toLowerCase() === email.toLowerCase() ? { ...u, password } : u
+    );
 
     localStorage.setItem(USERS_KEY, JSON.stringify(updatedUsers));
-    setSuccess('Senha alterada com sucesso! Faça login.');
+    setSuccess('Senha alterada com sucesso!');
     setStep('LOGIN');
-    setPassword('');
-    setConfirmPassword('');
+    setError('');
   };
 
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem(AUTH_KEY);
-    setEmail('');
-    setPassword('');
-  };
-
-  const resetStates = () => {
-    setError('');
-    setSuccess('');
-    setVerificationInput('');
+    // Limpa a URL se houver parâmetro de visualização
+    if (window.location.search.includes('view=')) {
+      window.location.href = window.location.pathname;
+    }
   };
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden transition-all duration-300">
+      <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4 py-12">
+        <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
           <div className="p-8">
             <div className="flex justify-center mb-6">
-              <div className="bg-indigo-600 p-3 rounded-xl shadow-lg shadow-indigo-200">
+              <div className="bg-indigo-600 p-4 rounded-2xl shadow-xl shadow-indigo-100">
                 <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 00-2 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
               </div>
             </div>
             
-            <h2 className="text-3xl font-bold text-center text-slate-800 mb-2">
-              {step === 'LOGIN' && 'Bem-vindo'}
-              {step === 'REGISTER' && 'Criar Conta'}
+            <h2 className="text-3xl font-black text-center text-slate-800 mb-2">
+              {step === 'LOGIN' && 'Acessar Conta'}
+              {step === 'REGISTER' && 'Nova Conta'}
               {step === 'FORGOT_PASSWORD' && 'Recuperar Senha'}
-              {step === 'VERIFY_CODE' && 'Verificar E-mail'}
+              {step === 'VERIFY_CODE' && 'Verificação'}
               {step === 'RESET_PASSWORD' && 'Nova Senha'}
             </h2>
-            <p className="text-center text-slate-500 mb-8">
-              {step === 'LOGIN' && 'Acesse sua conta exclusiva'}
-              {step === 'REGISTER' && 'Cadastre-se para gerenciar seus cavaletes'}
-              {step === 'FORGOT_PASSWORD' && 'Enviaremos um código para seu e-mail'}
-              {step === 'VERIFY_CODE' && `Digite o código enviado para ${email}`}
-              {step === 'RESET_PASSWORD' && 'Crie uma senha forte e segura'}
+            <p className="text-center text-slate-500 mb-8 text-sm">
+              {step === 'LOGIN' && 'Entre para gerenciar seus cavaletes'}
+              {step === 'REGISTER' && 'Crie seu acesso individual seguro'}
+              {step === 'FORGOT_PASSWORD' && 'Digite seu e-mail para receber o código'}
+              {step === 'VERIFY_CODE' && 'Digite o código que você recebeu'}
+              {step === 'RESET_PASSWORD' && 'Escolha uma nova senha de acesso'}
             </p>
-            
-            <form 
-              onSubmit={
-                step === 'LOGIN' ? handleLogin :
-                step === 'REGISTER' ? handleRegister :
-                step === 'FORGOT_PASSWORD' ? initiatePasswordRecovery :
-                step === 'VERIFY_CODE' ? handleVerifyCode :
-                handleResetPassword
-              } 
-              className="space-y-4"
-            >
-              {step === 'REGISTER' && (
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Nome Completo</label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                    placeholder="Seu nome"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                </div>
-              )}
+
+            <form onSubmit={
+              step === 'LOGIN' ? handleLogin :
+              step === 'REGISTER' ? handleRegister :
+              step === 'FORGOT_PASSWORD' ? initiateRecovery :
+              step === 'VERIFY_CODE' ? verifyCode :
+              resetPassword
+            } className="space-y-4">
               
+              {step === 'REGISTER' && (
+                <input
+                  type="text" required placeholder="Seu nome"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                  value={name} onChange={e => setName(e.target.value)}
+                />
+              )}
+
               {(step === 'LOGIN' || step === 'REGISTER' || step === 'FORGOT_PASSWORD') && (
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">E-mail</label>
-                  <input
-                    type="email"
-                    required
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                    placeholder="seu@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
+                <input
+                  type="email" required placeholder="E-mail"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                  value={email} onChange={e => setEmail(e.target.value)}
+                />
               )}
 
               {step === 'VERIFY_CODE' && (
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Código de 6 dígitos</label>
-                  <input
-                    type="text"
-                    required
-                    maxLength={6}
-                    className="w-full px-4 py-3 text-center tracking-widest text-2xl font-bold rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                    placeholder="000000"
-                    value={verificationInput}
-                    onChange={(e) => setVerificationInput(e.target.value)}
-                  />
-                </div>
+                <input
+                  type="text" required placeholder="Código de 6 dígitos"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none text-center font-bold text-xl tracking-widest"
+                  value={verificationInput} onChange={e => setVerificationInput(e.target.value)}
+                />
               )}
-              
+
               {(step === 'LOGIN' || step === 'REGISTER' || step === 'RESET_PASSWORD') && (
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">
-                    {step === 'RESET_PASSWORD' ? 'Nova Senha' : 'Senha'}
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </div>
+                <input
+                  type="password" required placeholder="Senha"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                  value={password} onChange={e => setPassword(e.target.value)}
+                />
               )}
 
               {step === 'RESET_PASSWORD' && (
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Confirmar Nova Senha</label>
-                  <input
-                    type="password"
-                    required
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                    placeholder="••••••••"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                  />
-                </div>
-              )}
-              
-              {error && (
-                <div className="p-3 text-sm text-red-600 bg-red-50 rounded-lg border border-red-100">
-                  {error}
-                </div>
+                <input
+                  type="password" required placeholder="Confirmar Senha"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                  value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+                />
               )}
 
-              {success && step === 'LOGIN' && (
-                <div className="p-3 text-sm text-emerald-600 bg-emerald-50 rounded-lg border border-emerald-100">
-                  {success}
-                </div>
-              )}
+              {error && <div className="p-3 text-xs text-red-600 bg-red-50 rounded-lg border border-red-100">{error}</div>}
+              {success && <div className="p-3 text-xs text-emerald-600 bg-emerald-50 rounded-lg border border-emerald-100">{success}</div>}
 
-              <button
-                type="submit"
-                className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold text-lg hover:bg-indigo-700 active:scale-[0.98] transition shadow-lg shadow-indigo-100 mt-2"
-              >
-                {step === 'LOGIN' && 'Entrar no Sistema'}
-                {step === 'REGISTER' && 'Criar Minha Conta'}
-                {step === 'FORGOT_PASSWORD' && 'Enviar Código'}
-                {step === 'VERIFY_CODE' && 'Validar Código'}
-                {step === 'RESET_PASSWORD' && 'Redefinir Senha'}
+              <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition active:scale-95 shadow-lg shadow-indigo-100">
+                Continuar
               </button>
             </form>
 
             <div className="mt-6 flex flex-col gap-3 text-center">
-              {step === 'LOGIN' && (
+              {step === 'LOGIN' ? (
                 <>
-                  <button
-                    onClick={() => { setStep('REGISTER'); resetStates(); }}
-                    className="text-indigo-600 font-semibold hover:text-indigo-800 transition text-sm"
-                  >
-                    Não tem uma conta? Criar conta
-                  </button>
-                  <button
-                    onClick={() => { setStep('FORGOT_PASSWORD'); resetStates(); }}
-                    className="text-slate-500 hover:text-indigo-600 transition text-sm"
-                  >
-                    Esqueceu sua senha?
-                  </button>
+                  <button onClick={() => setStep('REGISTER')} className="text-indigo-600 text-sm font-bold">Criar uma conta</button>
+                  <button onClick={() => setStep('FORGOT_PASSWORD')} className="text-slate-400 text-xs">Esqueci minha senha</button>
                 </>
-              )}
-
-              {(step !== 'LOGIN') && (
-                <button
-                  onClick={() => { setStep('LOGIN'); resetStates(); }}
-                  className="text-slate-500 hover:text-indigo-600 transition text-sm"
-                >
-                  Voltar para o Login
-                </button>
+              ) : (
+                <button onClick={() => setStep('LOGIN')} className="text-slate-500 text-sm">Voltar para o Login</button>
               )}
             </div>
-          </div>
-          <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
-            <p className="text-xs text-slate-400 uppercase tracking-widest font-semibold">CavaleteMaster Individual Account System</p>
           </div>
         </div>
       </div>
